@@ -52,11 +52,13 @@ This creates `places/YOUR_FILE_ID.json` and adds the house to your local town. C
 
 ## 5. Send your pull request
 
-Open a second terminal in your `forktown` folder and check your work:
+Open a second terminal in your `forktown` folder and check your house:
 
 ```sh
-npm run check
+npm run validate
 ```
+
+It takes a couple of seconds and names the exact file and field to fix. Changed the town’s code too? Run `npm run check` instead, which also runs the tests and the build.
 
 Once it passes, replace `YOUR_FILE_ID` with the file id from the builder and run:
 
@@ -64,8 +66,11 @@ Once it passes, replace `YOUR_FILE_ID` with the file id from the builder and run
 git add places/YOUR_FILE_ID.json
 git --no-pager diff --cached
 git commit -m "Add my place to Forktown"
+npm run check:pr -- origin/main HEAD
 git push -u origin add-my-place
 ```
+
+`npm run check:pr` makes sure your branch adds just one house.
 
 On your GitHub fork, click **Compare & pull request**. Target **renanbazinin/forktown → main**, check that only your new house file is included, complete the checklist, and click **Create pull request**.
 
@@ -77,7 +82,7 @@ Forktown makes a first open-source contribution something you can visit. Each co
 
 The town has a life of its own: neighbors take walks, meet at concerts, watch films, and stop by football matches. A full day and night lasts 24 real minutes, and each season about 11 hours: blossom, fireflies, turning leaves, then snow. Explore at your own pace, follow a resident, or enjoy the [live view](https://renanbazinin.github.io/forktown/).
 
-Want to help beyond building a house? Improve the guides, report a bug, or contribute to the town itself. The [project guide](docs/PROJECT_GUIDE.md) covers features, code structure, and development commands.
+Want to help beyond building a house? Pick up an open [good first issue](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) or one marked [help wanted](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22), improve the guides, report a bug, or contribute to the town itself. The [project guide](docs/PROJECT_GUIDE.md) covers features, code structure, and development commands.
 
 ---
 

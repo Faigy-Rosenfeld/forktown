@@ -93,13 +93,13 @@ You can also let the builder create the file: choose **Find your way in → Buil
 
 The builder and save button are available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy.
 
-Before sending a pull request:
+Before sending a pull request, check your house:
 
 ```sh
-npm run check
+npm run validate
 ```
 
-You can also run only `npm run validate` for a quick data check. The check points to the exact file and field that needs attention.
+It takes a couple of seconds and points to the exact file and field that needs attention. On GitHub, the pull request check runs it first and notes each problem on the file. If you changed code too, run `npm run check`: it runs the tests, the validator, type checks, and the production build.
 
 The pull request check also runs `npm run format:check` on code and docs. If it lists a file you changed, run `npm run format` to tidy the spacing, then commit the change. House files in `places/` are left to the validator, so spacing there never fails a pull request.
 
@@ -116,8 +116,12 @@ After committing, run `npm run check:pr -- origin/main HEAD` to check the house 
 
 ## Other ways to help
 
-Improve the guide, report a reproducible bug, test the site with a screen reader, add translations, draw a new building style in the renderer, or help plan the next neighborhood. For a new mechanism or a large change, open an issue first so we can agree on the shape of it.
+Looking for something to pick up? Issues labeled [good first issue](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) are small, with file pointers and a clear finish line. [Help wanted](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22) issues are bigger pieces of the town, or need a particular skill. Say hello on the issue before you start, so two people don’t build the same thing.
+
+You can also improve the guide, report a reproducible bug, test the site with a screen reader, add translations, draw a new building style in the renderer, or help plan the next neighborhood. For a new mechanism or a large change, open an issue first so we can agree on the shape of it.
+
+Here for Hacktoberfest? See [what it means in Forktown](docs/CONTRIBUTION_POLICY.md#hacktoberfest).
 
 Implementation notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Please keep meaningful tests for contribution rules, geometry, and other behavior that newcomers depend on.
 
-`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy.
+`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Tests read the town with `readPlaces()` from `tests/full-town.ts`, which hands out the made-up houses first, so a test that leans on "the first house" in `places/` will most likely fail there; a test that needs a particular home takes it from `tests/fixtures.ts`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy.

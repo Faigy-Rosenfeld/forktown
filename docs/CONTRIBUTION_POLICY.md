@@ -2,7 +2,7 @@
 
 Enabled on `main` on September 21, 2026. See [verified GitHub results](CONTRIBUTION_VERIFICATION.md).
 
-The required `Contribution policy` status inspects PR files through GitHub's API. Only trusted default-branch code runs; PR code is never checked out and its dependencies are never installed. The token reads contents/PRs and writes statuses, but cannot merge or deploy. API failures and incomplete lists fail the check.
+The required `Contribution policy` status inspects PR files through GitHub's API. Only trusted default-branch code runs; PR code is never checked out and its dependencies are never installed. The token reads contents/PRs and writes statuses, but cannot merge or deploy. API failures and incomplete lists fail the check. A failed status shows the first thing to fix, such as a creator that isn't the PR author's username; the workflow log lists every problem.
 
 The result is a status on the PR's head commit, and more than one PR can point at the same commit. So the check evaluates every open PR into the default branch that shares the head commit, and passes only when all of them pass. A duplicate PR can't borrow another PR's pass or flip its result. A failing duplicate does hold the others back until a maintainer closes it and runs the check again. PRs into other branches aren't merge-gated, so they get no status.
 
@@ -35,4 +35,14 @@ A new neighbor's first house doesn't wait for a maintainer. The `Auto-merge` wor
 
 The workflow runs when Check town, Contribution policy or the review signal finishes for a PR, and a maintainer can run it with a PR number. Like the policy, it runs only trusted default-branch code and reads PR contents through the API. It squash-merges, titled "PR title (#N)", so the commit on `main` credits the contributor rather than the workflow. The merge is pinned to the head that passed, so a newer push makes GitHub refuse. Then it starts Publish town, because a merge made with the workflow's token starts no push workflow. PRs that aren't one new house get no `Auto-merge` status. The workflow only runs from `main`, so it takes over from the first house PR after it lands.
 
+That Publish town run has its `tested` input set to `true`, so it only builds, skipping about two minutes of tests: the workflow has just seen `check` pass on the exact head it merged, up to date with `main`, so `main` holds the files that were tested. Pushes to `main` and runs by hand still run the full `npm run check` first, unless a maintainer picks `tested` themselves.
+
+Last, it welcomes the new neighbor with one comment on the PR, marked so a rerun never posts a second. It @mentions them, links their house (`#place=` with the id from the file name) and the Lantern Fork (`#venue=fork`), and says the house appears in a couple of minutes, once the town is rebuilt, and to reload the page if it isn't there yet: GitHub Pages lets browsers cache it for ten minutes. It also explains that changing the house later takes a new PR that edits only their own file, which a maintainer reviews. It never quotes the house's name, story or sign, which nobody may have read yet. The address is the one Publish town builds for: `PAGES_SITE_URL`, or the repository's github.io address. Without `ENABLE_PAGES`, or when Publish town couldn't be started, the comment leaves out the links and the promise. A comment that fails is only logged: the merge and Publish town stand either way.
+
 These merges skip a person's reading of the name, story and sign. The repository's Actions setting holds checks for a maintainer's approval only when a first-time contributor is also new to GitHub, so most first houses go live before anyone reads them, and moderation happens afterwards. To stop an auto-merge, request changes or convert the PR to a draft. It goes ahead once the maintainer who asked for changes approves, or once the PR is ready for review again. Never make `Auto-merge` a required check: its failure means a maintainer decides, not that the PR can't merge.
+
+## Hacktoberfest
+
+Hacktoberfest 2026 doesn't count pull requests. This year it's built around in-person and online events for building and learning with open-source AI; see the [Hacktoberfest FAQ](https://hacktoberfest.com/questions/). You're welcome here in October as in any month.
+
+Forktown doesn't carry the `hacktoberfest` topic. In past years the topic made every merged pull request count, and here that would include first houses, which merge by themselves, most of them before anyone reads them. If a later Hacktoberfest counts pull requests again, maintainers will add the `hacktoberfest-accepted` label to pull requests they have reviewed and merged. A first house merges by itself, so it doesn't get the label. It's just as welcome.
