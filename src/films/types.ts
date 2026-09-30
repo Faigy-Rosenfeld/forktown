@@ -1,3 +1,4 @@
+import type { BreakCard, BreakCardData } from '../lib/break-cards';
 import type { CinemaAd, CinemaFilm } from '../lib/cinema';
 import type { FilmCue } from '../music/cinema-score';
 import type { AdLook, Ctx, Look } from './kit';
@@ -22,5 +23,16 @@ export type AdModule = {
   draw: (ctx: Ctx, p: number, seconds: number) => void;
   score: (ad: CinemaAd) => FilmCue[];
   /** The closing sponsor slate, painted over the last few seconds by the projector. */
+  look: AdLook;
+};
+
+/**
+ * One break card on the live stream: its pictures and its jingle. Cards get their houses and
+ * listings only through `data`; with `data = { now: 0 }` each draws a sample of its own.
+ */
+export type CardModule = {
+  /** Paints one frame. `p` runs from 0 to 1 across the card; `seconds` is its own clock. */
+  draw: (ctx: Ctx, p: number, seconds: number, data: BreakCardData) => void;
+  score: (card: BreakCard) => FilmCue[];
   look: AdLook;
 };

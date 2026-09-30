@@ -1,3 +1,4 @@
+import type { BreakCard } from '../lib/break-cards';
 import type { CinemaAd, CinemaFilm } from '../lib/cinema';
 import type { FilmCue, FilmEffect } from '../music/cinema-score';
 import type { Voice } from '../music/score';
@@ -199,14 +200,24 @@ export function composeFilm(
   return cues.sort((a, b) => a.at - b.at);
 }
 
-/** An ad's jingle: no titles, so story time runs across the spot, inside a breath of silence. */
-export function composeAd(ad: CinemaAd, write: (score: Score) => void): FilmCue[] {
-  const { cues, score } = cueSheet(ad.duration, 0.1, ad.duration - 0.4);
+/** A spot's cue sheet: story time runs across it, inside a breath of silence at either end. */
+function composeSpot(duration: number, write: (score: Score) => void): FilmCue[] {
+  const { cues, score } = cueSheet(duration, 0.1, duration - 0.4);
   write(score);
   // Pads that would ring past the spot stop just short of it, so the next one starts clean.
-  const end = ad.duration - 0.2;
+  const end = duration - 0.2;
   return cues
     .filter((cue) => cue.at < end)
     .map((cue) => ({ ...cue, duration: Math.min(cue.duration, end - cue.at) }))
     .sort((a, b) => a.at - b.at);
+}
+
+/** An ad's jingle: no titles, so story time runs across the spot, inside a breath of silence. */
+export function composeAd(ad: CinemaAd, write: (score: Score) => void): FilmCue[] {
+  return composeSpot(ad.duration, write);
+}
+
+/** A break card's jingle, timed like an ad's: story time runs across the whole card. */
+export function composeCard(card: BreakCard, write: (score: Score) => void): FilmCue[] {
+  return composeSpot(card.duration, write);
 }

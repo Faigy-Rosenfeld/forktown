@@ -49,3 +49,4 @@ export const REEL: Record<FilmArtwork, FilmModule> = {
   roadtest: mirrorSignalPanic,
 };
 export { ADS } from './ads';
+export { CARDS } from './cards';

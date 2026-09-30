@@ -3,6 +3,7 @@ import { renderFootballTakes, renderTrack } from './synth';
 import { FOOTBALL_SOUND_TAKES, renderFootballSound } from './football-sound';
 import type { FootballSound } from '../lib/football';
 import { CinemaPlayer, type CinemaPlayback } from './cinema-player';
+import type { Playable } from '../lib/break-cards';
 
 export class TownPlayer {
   private context: AudioContext;
@@ -44,6 +45,10 @@ export class TownPlayer {
   }
   cinemaSound(state?: CinemaPlayback) {
     this.cinema.sync(state);
+  }
+  /** Warms the render of a film, ad or break card that is about to play. */
+  cinemaPrepare(film: Playable) {
+    this.cinema.prepare(film);
   }
   get cinemaStatus() {
     return this.cinema.status;

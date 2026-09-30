@@ -12,8 +12,8 @@ import {
   liveProgram,
   liveShotAt,
 } from '../lib/live-director';
-import { latestArrival, places } from '../lib/places';
-import { project } from '../lib/world';
+import { isFoundingPlace, latestArrival, places } from '../lib/places';
+import { getPlot, plotEntrance, project } from '../lib/world';
 import { townCatAt, TOWN_CAT_NAME } from '../lib/town-cat';
 import { simulateResidents } from '../lib/simulation';
 import { residentTrips } from '../lib/resident-trips';
@@ -21,11 +21,39 @@ import { useTownDayPrefetch, whenIdle } from '../lib/idle-prefetch';
 import { useTownClock } from '../lib/use-town-clock';
 import { trackForTown } from '../music/score';
 import { cinemaAt, cinemaListening } from '../lib/cinema';
+import { townArrivalDates, townArrivals } from '../lib/arrivals';
+import { TOWN_DAY_MS } from '../lib/town-time';
+import { readLiveParams } from '../lib/live-params';
+import {
+  activeBreak,
+  breakOpacity,
+  itemKey,
+  quietFor,
+  welcomeShotAt,
+  welcomeTimeline,
+  type WelcomeStep,
+} from '../lib/live-breaks';
+import {
+  forcedStart,
+  forktownBuild,
+  installLiveHarness,
+  playableOf,
+  upcomingPlayable,
+  welcomeEarliest,
+  welcomeFallback,
+  welcomePhase,
+  type ForktownLive,
+} from '../lib/live-harness';
 import Soundtrack from './Soundtrack';
+import BreakOverlay, { useBreakFilms } from './BreakOverlay';
 import ResidentPreview from './ResidentPreview';
 import BrandMark from './BrandMark';
 import { TAGLINE } from '../lib/brand';
 import '../live.css';
+
+// One shared object each, so the break engine's memos keep hitting frame after frame.
+const arrivalDates = townArrivalDates as Record<string, string>;
+const NO_WELCOME: WelcomeStep[] = [];
 
 export default function LiveStream() {
   const clock = useTownClock({ autoPlay: true });
@@ -34,6 +62,20 @@ export default function LiveStream() {
   const camera = useRef<Camera | null>(null);
   const lastPaint = useRef<number | null>(null);
   const lastShot = useRef<string | null>(null);
+  // What the address asks for (breaks, a forced item, a welcome), read once as the page opens.
+  const [mountedAt] = useState(() => Date.now());
+  const [params] = useState(() => readLiveParams(window.location.search, mountedAt));
+  const welcomeIds = useMemo(
+    () =>
+      params.welcome.filter((id) =>
+        places.some((place) => place.id === id && !isFoundingPlace(place)),
+      ),
+    [params],
+  );
+  const films = useBreakFilms(
+    params.breakMinutes !== null || params.forced !== null || welcomeIds.length > 0,
+  );
+  const [welcomeCalledAt, setWelcomeCalledAt] = useState<number | null>(null);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const [cinemaField, setCinemaField] = useState({ gain: 0, pan: 0 });
@@ -56,14 +98,129 @@ export default function LiveStream() {
     [clock.minutes, clock.day],
   );
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
-  const shot = liveShotAt(program, clock.minutes, residents);
+
+  // Breaks and the welcome run on the same UTC clock as the town, in epoch ms.
+  const ms = clock.day * TOWN_DAY_MS + clock.minutes * 1000;
+  const filmsReady = films.state === 'ready';
+  const welcomeTrigger = welcomeIds.length
+    ? (welcomeCalledAt ?? welcomeFallback(mountedAt, params.welcomeWait))
+    : null;
+  const earliest =
+    welcomeTrigger === null ? null : welcomeEarliest(welcomeTrigger, films.settledAt, ms);
+  const welcome = useMemo(
+    () =>
+      earliest === null
+        ? NO_WELCOME
+        : welcomeTimeline(
+            welcomeIds,
+            earliest,
+            places,
+            townArrivals,
+            arrivalDates,
+            params.breakMinutes,
+            mountedAt,
+          ),
+    [earliest, welcomeIds, params.breakMinutes, mountedAt],
+  );
+  const forcedAt = params.forced ? forcedStart(mountedAt, films.readyAt) : null;
+  const forced = useMemo(
+    () => (params.forced && forcedAt !== null ? { item: params.forced, start: forcedAt } : null),
+    [params.forced, forcedAt],
+  );
+  const active = activeBreak({
+    ms,
+    places,
+    minutes: params.breakMinutes,
+    forced,
+    welcome,
+    mountedAt,
+    arrivals: townArrivals,
+    dates: arrivalDates,
+  });
+  // A break covers the town only once its pictures can draw; until then the town carries on.
+  const shown = filmsReady ? active : null;
+  const opacity = shown ? breakOpacity(shown, ms) : 0;
+  const covered = opacity === 1;
+  const breakTitle = shown
+    ? shown.item.kind === 'ad'
+      ? shown.item.ad.sponsor
+      : shown.item.card.title
+    : null;
+  const breakSound = useMemo(
+    () =>
+      shown
+        ? { film: playableOf(shown.item), elapsed: (ms - shown.start) / 1000, key: shown.key }
+        : null,
+    [shown, ms],
+  );
+  // Render the next card's or ad's sound ahead, so its first note lands with its first frame. A
+  // requested welcome warms its card from the start: its first card begins the moment it's placed.
+  const second = Math.floor(ms / 1000);
+  const welcomeArmed = welcomeIds.length > 0 && earliest === null;
+  const prepare = useMemo(
+    () =>
+      upcomingPlayable({
+        ms: second * 1000,
+        places,
+        minutes: params.breakMinutes,
+        forced,
+        welcome,
+        mountedAt,
+        welcomeArmed,
+      }),
+    [second, params.breakMinutes, forced, welcome, mountedAt, welcomeArmed],
+  );
+
+  const welcomeStep = welcome.find((step) => ms >= step.start && ms < step.end);
+  // The camera moves to the new house once the welcome card covers the town, and settles there.
+  const welcomeShot =
+    welcomeStep && (welcomeStep.kind === 'hold' || !shown || ms >= welcomeStep.start + 400)
+      ? welcomeShotAt(welcomeStep)
+      : null;
+  const shot = welcomeShot ?? liveShotAt(program, clock.minutes, residents);
   const followedResident = residents.find((resident) => resident.id === shot.residentId);
   const cat = townCatAt(places, clock.minutes, clock.day);
-  const followPosition =
-    followedResident?.position ?? (shot.kind === 'cat' ? cat.position : undefined);
-  const followName =
-    followedResident?.resident.name ?? (shot.kind === 'cat' ? TOWN_CAT_NAME : undefined);
+  const welcomeHold = welcomeStep?.kind === 'hold' ? welcomeStep.house.place : null;
+  const welcomePlot = welcomeHold ? getPlot(welcomeHold.plot) : undefined;
+  // The label sits at the new house's front path, in tiles: the paint below projects it once.
+  const followPosition = welcomeHold
+    ? welcomePlot
+      ? plotEntrance(welcomePlot)
+      : undefined
+    : (followedResident?.position ?? (shot.kind === 'cat' ? cat.position : undefined));
+  const followName = welcomeHold
+    ? welcomeHold.name
+    : (followedResident?.resident.name ?? (shot.kind === 'cat' ? TOWN_CAT_NAME : undefined));
+  const followCaption = welcomeHold ? 'New neighbor' : 'Following';
   const night = clock.minutes < 360 || clock.minutes >= 1200;
+
+  // window.forktownLive reads the latest render through this ref, installed once below.
+  const harness = useRef<ForktownLive | null>(null);
+  useEffect(() => {
+    harness.current = {
+      version: 1,
+      build: forktownBuild,
+      quietFor: (seconds) => quietFor(Date.now(), seconds, places, welcome),
+      startWelcome: () => {
+        const phase = welcomePhase(welcomeIds.length > 0, earliest, welcome, Date.now());
+        if (phase === 'none' || phase === 'done') return false;
+        // Idempotent: the first call (or the fallback, if it came first) fixes the start.
+        const now = Date.now();
+        if (welcomeCalledAt === null && now < welcomeTrigger!)
+          setWelcomeCalledAt((old) => old ?? now);
+        return true;
+      },
+      state: () => ({
+        shot: shot.id,
+        label: shot.label,
+        break: shown ? { key: shown.key, item: itemKey(shown.item), endsAt: shown.end } : null,
+        welcome: welcomePhase(welcomeIds.length > 0, earliest, welcome, Date.now()),
+        films: films.state,
+        build: forktownBuild,
+      }),
+    };
+  });
+  useEffect(() => installLiveHarness(() => harness.current!), []);
 
   useEffect(() => {
     document.title = 'Forktown Live';
@@ -103,22 +260,24 @@ export default function LiveStream() {
     lastPaint.current = now;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    renderTwilight({
-      ctx,
-      ...size,
-      camera: camera.current,
-      places,
-      residents,
-      events,
-      football,
-      minutes: clock.minutes,
-      day: clock.day,
-      night,
-      selectedPlot: null,
-      hoveredPlot: null,
-      showPlots: false,
-      followed: shot.residentId,
-    });
+    // Under a fully opaque break the town needn't paint; the camera above keeps easing.
+    if (!covered)
+      renderTwilight({
+        ctx,
+        ...size,
+        camera: camera.current,
+        places,
+        residents,
+        events,
+        football,
+        minutes: clock.minutes,
+        day: clock.day,
+        night,
+        selectedPlot: null,
+        hoveredPlot: null,
+        showPlots: false,
+        followed: shot.residentId,
+      });
     if (followLabel.current && followPosition) {
       const point = project(followPosition.x, followPosition.y);
       const x = point.x * camera.current.zoom + camera.current.x;
@@ -158,12 +317,13 @@ export default function LiveStream() {
     followPosition?.y,
     shot.id,
     shot.kind,
+    covered,
   ]);
 
   return (
-    <main className={`live-stream ${night ? 'live-stream-night' : ''}`}>
+    <main className={`live-stream ${night ? 'live-stream-night' : ''}`} data-break={shown?.key}>
       <h1 className="sr-only">Forktown live stream</h1>
-      <canvas ref={canvas} role="img" aria-label={`Forktown live: ${shot.label}`} />
+      <canvas ref={canvas} role="img" aria-label={`Forktown live: ${breakTitle ?? shot.label}`} />
       <div className="live-watermark" role="img" aria-label="Forktown">
         <BrandMark size={40} night={night} />
       </div>
@@ -199,11 +359,12 @@ export default function LiveStream() {
         <div ref={followLabel} className="live-follow-label live-glass" role="status">
           <span className="live-caption">
             <i aria-hidden="true" />
-            Following
+            {followCaption}
           </span>
           <strong>{followName}</strong>
         </div>
       )}
+      <BreakOverlay active={shown} ms={ms} />
       <Soundtrack
         track={trackForTown(clock.minutes, events)}
         playing={clock.playing}
@@ -211,6 +372,8 @@ export default function LiveStream() {
         listening={listening}
         cinema={cinema}
         cinemaListening={cinemaField}
+        breakSound={breakSound}
+        prepare={prepare}
         autoStart
         hideControls
       />

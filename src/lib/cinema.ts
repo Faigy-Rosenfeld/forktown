@@ -94,7 +94,19 @@ export type CinemaFilm = {
   genre?: FilmGenre;
 };
 /** Every ad is a self-contained module in `src/films/ads/`, keyed by its artwork. */
-export type AdArtwork = 'snacks' | 'phones' | 'eggs' | 'matchday' | 'disco' | 'millpond' | 'zoo';
+export type AdArtwork =
+  | 'snacks'
+  | 'phones'
+  | 'eggs'
+  | 'matchday'
+  | 'disco'
+  | 'millpond'
+  | 'zoo'
+  | 'realty'
+  | 'tube'
+  | 'ducks'
+  | 'lanterns'
+  | 'movers';
 /** A short spot from somewhere in town, shown in the breaks between films. */
 export type CinemaAd = {
   id: string;
@@ -330,6 +342,41 @@ export const CINEMA_ADS: readonly CinemaAd[] = [
     tagline: 'Come and say hello. The penguins insist.',
     duration: 30,
     artwork: 'zoo',
+  },
+  {
+    id: 'open-plot-realty',
+    sponsor: 'Open Plot Realty',
+    tagline: 'Location, location, lantern.',
+    duration: 30,
+    artwork: 'realty',
+  },
+  {
+    id: 'the-treeline',
+    sponsor: 'The Treeline',
+    tagline: 'Under ten minutes, door to door. Mind the whoosh.',
+    duration: 20,
+    artwork: 'tube',
+  },
+  {
+    id: 'duck-crossing-authority',
+    sponsor: 'Duck Crossing Authority',
+    tagline: 'Right of way, 08:00 to 12:30. Wait for the fifth one.',
+    duration: 20,
+    artwork: 'ducks',
+  },
+  {
+    id: 'lantern-fork-electric',
+    sponsor: 'Lantern Fork Electric',
+    tagline: 'We light up at 20:00, so you don’t have to.',
+    duration: 10,
+    artwork: 'lanterns',
+  },
+  {
+    id: 'carry-in-movers',
+    sponsor: 'Carry-In Movers',
+    tagline: 'First house? We carry it in for you.',
+    duration: 10,
+    artwork: 'movers',
   },
 ];
 export type CinemaSlot = {

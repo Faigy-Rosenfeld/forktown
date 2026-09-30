@@ -5,6 +5,7 @@ import { TownPlayer } from '../music/player';
 import { footballSoundsBetween } from '../music/football-sound';
 import type { FootballState } from '../lib/football';
 import type { cinemaAt } from '../lib/cinema';
+import type { Playable } from '../lib/break-cards';
 
 export default function Soundtrack({
   track,
@@ -13,6 +14,8 @@ export default function Soundtrack({
   listening,
   cinema,
   cinemaListening,
+  breakSound = null,
+  prepare = null,
   autoStart = false,
   hideControls = false,
 }: {
@@ -22,6 +25,10 @@ export default function Soundtrack({
   listening: { gain: number; pan: number };
   cinema: ReturnType<typeof cinemaAt>;
   cinemaListening: { gain: number; pan: number };
+  /** A live-stream break on air: its jingle plays full and centred, over the town's music. */
+  breakSound?: { film: Playable; elapsed: number; key: string } | null;
+  /** The next break's ad or card, rendered ahead so its sound starts on time. */
+  prepare?: Playable | null;
   autoStart?: boolean;
   hideControls?: boolean;
 }) {
@@ -40,19 +47,33 @@ export default function Soundtrack({
   useEffect(() => {
     const film = cinema.slot?.film ?? cinema.slot?.ad;
     player.current?.cinemaSound(
-      enabled && playing && !hidden && film
-        ? {
-            film,
-            elapsed: cinema.elapsed,
-            // An ad can play twice in one night, so the key includes where it starts.
-            key: `${cinema.program.day}:${cinema.slot!.start}:${film.id}`,
-            ...cinemaListening,
-          }
+      enabled && playing && !hidden
+        ? breakSound
+          ? { ...breakSound, gain: 1, pan: 0 }
+          : film
+            ? {
+                film,
+                elapsed: cinema.elapsed,
+                // An ad can play twice in one night, so the key includes where it starts.
+                key: `${cinema.program.day}:${cinema.slot!.start}:${film.id}`,
+                ...cinemaListening,
+              }
+            : undefined
         : undefined,
     );
-  }, [cinema, cinemaListening, enabled, playing, hidden]);
+  }, [cinema, cinemaListening, enabled, playing, hidden, breakSound]);
   useEffect(() => {
-    if (!enabled || !playing || hidden || !football.live || listening.gain < 0.015) {
+    if (enabled && prepare) player.current?.cinemaPrepare(prepare);
+  }, [enabled, prepare]);
+  useEffect(() => {
+    if (
+      !enabled ||
+      !playing ||
+      hidden ||
+      !football.live ||
+      listening.gain < 0.015 ||
+      !!breakSound
+    ) {
       previousMatch.current = null;
       player.current?.silenceEffects();
       return;
@@ -60,7 +81,7 @@ export default function Soundtrack({
     for (const sound of footballSoundsBetween(previousMatch.current, football))
       player.current?.effect(sound.kind, listening.gain * sound.strength, listening.pan);
     previousMatch.current = football;
-  }, [football, enabled, playing, hidden, listening]);
+  }, [football, enabled, playing, hidden, listening, breakSound]);
   useEffect(() => {
     const visibility = () => setHidden(document.hidden);
     document.addEventListener('visibilitychange', visibility);

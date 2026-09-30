@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Forktown · Live Breaks</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        background: #152a2b;
+        color: #ece2c5;
+        font: 15px system-ui;
+      }
+      main {
+        max-width: 1320px;
+        margin: auto;
+        padding: 24px 20px 40px;
+      }
+      h1 {
+        font: 32px Georgia;
+        margin: 8px 0 6px;
+      }
+      p {
+        color: #b5c4b6;
+        line-height: 1.5;
+        margin: 6px 0;
+      }
+      a {
+        color: #e3cf9d;
+      }
+      nav {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin: 14px 0;
+      }
+      button {
+        background: #395a50;
+        color: #ece2c5;
+        border: 1px solid #718670;
+        border-radius: 6px;
+        padding: 8px 18px;
+        cursor: pointer;
+      }
+      input[type='range'] {
+        flex: 1;
+        accent-color: #d8bc7a;
+      }
+      output {
+        font:
+          14px ui-monospace,
+          monospace;
+        min-width: 110px;
+      }
+      #render {
+        display: block;
+        width: 100%;
+        max-width: 1280px;
+        aspect-ratio: 16 / 9;
+        background: #263c3c;
+        image-rendering: pixelated;
+      }
+      #list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 18px;
+        margin-top: 18px;
+      }
+      article {
+        border: 1px solid #425b50;
+        border-radius: 8px;
+        overflow: hidden;
+        background: #203a36;
+      }
+      article canvas {
+        display: block;
+        width: 100%;
+        image-rendering: pixelated;
+      }
+      article h2 {
+        font-size: 16px;
+        margin: 12px 14px 4px;
+      }
+      article p {
+        margin: 0 14px 12px;
+        font-size: 13px;
+      }
+      #sheet {
+        display: block;
+        max-width: 100%;
+        image-rendering: pixelated;
+      }
+      #error {
+        color: #ffb4a8;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <nav id="nav"><a href="/tests/manual/breaks.html">All breaks</a></nav>
+      <h1 id="heading">Live breaks</h1>
+      <p id="about">
+        Every ad and card the live stream can show between shots, drawn at 320×180 and scaled 4×
+        like /live/. Add <code>?item=ad:zoo</code> or <code>?item=card:right-back</code>,
+        <code>&amp;t=</code> to pin a frame, <code>&amp;sheet=1</code> for a contact sheet (<code
+          >from, to, step, cols, scale</code
+        >), and <code>&amp;house=&lt;id&gt;</code> for the cards’ house.
+      </p>
+      <p id="error" role="alert" hidden></p>
+      <section id="player" hidden>
+        <div class="controls">
+          <button id="play">Play</button>
+          <button id="sound" aria-pressed="false">Turn sound on</button>
+          <input
+            id="scrub"
+            type="range"
+            min="0"
+            max="1"
+            step="0.0001"
+            value="0"
+            aria-label="Time"
+          />
+          <output id="time">0.00 s</output>
+        </div>
+        <p id="audio-status" role="status"></p>
+      </section>
+      <canvas id="render" width="1280" height="720" hidden></canvas>
+      <canvas id="sheet" hidden></canvas>
+      <section id="list" aria-label="Every live break" hidden></section>
+    </main>
+    <script type="module">
+      import '@fontsource/fraunces/500.css';
+      import '@fontsource/fraunces/500-italic.css';
+      import '@fontsource/space-mono/700.css';
+      import '@fontsource/dm-sans/500.css';
+      // Only what the reel needs is imported up front, so window.breakRender (used by
+      // scripts/render-intermission.ts) works even while the town's card data is broken.
+      import { CINEMA_ADS } from '/src/lib/cinema.ts';
+      import { BREAK_CARDS, LIVE_BREAK_ADS, REEL_SEGMENTS } from '/src/lib/break-cards.ts';
+      import { drawBreakAd, drawBreakCard, loadReel, reelReady } from '/src/city/cinema-films.ts';
+
+      const W = 320,
+        H = 180,
+        SCALE = 4;
+      const params = new URLSearchParams(location.search);
+      const number = (key, fallback) => {
+        const value = Number(params.get(key));
+        return params.has(key) && Number.isFinite(value) ? value : fallback;
+      };
+      const $ = (selector) => document.querySelector(selector);
+      const fail = (message) => {
+        $('#error').hidden = false;
+        $('#error').textContent = message;
+      };
+
+      // A fixed moment for the cards: an odd UTC hour at :30 is 18:00 in town.
+      const NOW = Date.UTC(2026, 8, 29, 17, 30);
+
+      // ---- Card data from the real town (the newest neighbor unless &house= picks one). If it
+      // fails to load, the cards fall back to the sample rows and house built into each card.
+      let DATA = { now: NOW };
+      try {
+        const [town, arrivals, breaks] = await Promise.all([
+          import('/src/lib/places.ts'),
+          import('/src/lib/arrivals.ts'),
+          import('/src/lib/live-breaks.ts'),
+        ]);
+        const { places, isFoundingPlace, latestArrival } = town;
+        const houseId =
+          params.get('house') ??
+          (latestArrival ?? places.find((place) => !isFoundingPlace(place)) ?? places[0])?.id;
+        const house = houseId
+          ? breaks.spotlightHouse(houseId, places, arrivals.townArrivals, arrivals.townArrivalDates)
+          : null;
+        if (params.has('house') && !house) fail(`No house with the id “${params.get('house')}”.`);
+        DATA = {
+          now: NOW,
+          comingUp: breaks.comingUpAt(NOW, places),
+          calendar: breaks.calendarAt(NOW),
+          ...(house ? { house } : {}),
+        };
+      } catch (error) {
+        fail(`The town’s card data did not load, so cards show their samples: ${error?.message}`);
+      }
+      const house = DATA.house;
+
+      // ---- Items: every live-break ad and card, by item key (ad:<artwork> or card:<card>).
+      const items = [
+        ...Object.values(BREAK_CARDS).map((card) => ({
+          key: `card:${card.card}`,
+          name: card.title,
+          about: `Card · ${card.duration} s`,
+          duration: card.duration,
+          playable: card,
+          paint: (ctx, seconds) => drawBreakCard(ctx, card, seconds, DATA),
+        })),
+        ...CINEMA_ADS.map((ad) => ({
+          key: `ad:${ad.artwork}`,
+          name: ad.sponsor,
+          about: `Ad · ${ad.duration} s · ${ad.tagline}`,
+          duration: ad.duration,
+          playable: ad,
+          live: LIVE_BREAK_ADS.includes(ad),
+          paint: (ctx, seconds) => drawBreakAd(ctx, ad, seconds),
+        })),
+      ];
+      const byKey = new Map(items.map((item) => [item.key, item]));
+      /** Reel segment ids ('right-back', 'ad-zoo'), item keys, and bare card names all work. */
+      const lookup = (id) =>
+        byKey.get(id) ??
+        byKey.get(`card:${id}`) ??
+        (id.startsWith('ad-') ? byKey.get(`ad:${id.slice(3)}`) : undefined);
+
+      // One offscreen 320×180 frame, scaled up with no smoothing: pixel for pixel what /live/ shows.
+      const frame = document.createElement('canvas');
+      frame.width = W;
+      frame.height = H;
+      const frameCtx = frame.getContext('2d');
+      function paintFrame(item, seconds) {
+        frameCtx.setTransform(1, 0, 0, 1, 0, 0);
+        frameCtx.globalAlpha = 1;
+        frameCtx.fillStyle = '#263C3C';
+        frameCtx.fillRect(0, 0, W, H);
+        // Whatever state a drawing leaves behind never leaks into the next frame.
+        frameCtx.save();
+        item.paint(frameCtx, seconds);
+        frameCtx.restore();
+        return frame;
+      }
+      function blit(target, item, seconds, x = 0, y = 0, scale = SCALE) {
+        const ctx = target.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(paintFrame(item, seconds), x, y, W * scale, H * scale);
+      }
+
+      const FACES = [
+        '500 20px Fraunces',
+        'italic 500 9px Fraunces',
+        'bold 10px "Space Mono"',
+        '500 12px "DM Sans"',
+      ];
+      // Latin and Latin Extended subsets both load up front, so no face swaps in mid-segment.
+      const SAMPLE_TEXT = 'AaBbGg09 ’·…é@ ŁőŞ';
+      // Canvas text never waits for a web font: it paints a fallback until the face arrives. So the
+      // reel only starts once every face the ads and cards use is loaded, or it fails loudly.
+      const ready = (async () => {
+        await loadReel();
+        if (!reelReady()) throw new Error('The reel’s ads and cards did not load.');
+        await Promise.all(FACES.map((face) => document.fonts.load(face, SAMPLE_TEXT)));
+        const missing = FACES.filter((face) => !document.fonts.check(face, SAMPLE_TEXT));
+        if (missing.length) throw new Error(`Fonts did not load: ${missing.join(', ')}`);
+      })();
+      window.breakRender = {
+        ready,
+        segments: () => REEL_SEGMENTS.map((segment) => ({ ...segment })),
+        draw(id, seconds) {
+          const item = lookup(id);
+          if (!item) throw new Error(`No break called “${id}”.`);
+          blit($('#render'), item, seconds);
+        },
+      };
+      try {
+        await ready;
+      } catch (error) {
+        fail(String(error?.message ?? error));
+      }
+
+      const nav = $('#nav');
+      const link = (href, text) => {
+        const a = document.createElement('a');
+        a.href = href;
+        a.textContent = text;
+        nav.append(a);
+      };
+      const query = (entries) => `?${new URLSearchParams(entries)}`;
+      const houseQuery = params.has('house') ? { house: params.get('house') } : {};
+      const selected = params.has('item') ? byKey.get(params.get('item')) : undefined;
+      if (params.has('item') && !selected) fail(`No break called “${params.get('item')}”.`);
+
+      if (selected && params.get('sheet') === '1') {
+        // ---- A labelled contact sheet.
+        const from = number('from', 0),
+          to = number('to', selected.duration),
+          step = Math.max(1 / 15, number('step', 1)),
+          cols = Math.max(1, Math.round(number('cols', 6))),
+          scale = Math.max(0.25, number('scale', 1));
+        const times = [];
+        for (let t = from; t <= to + 1e-9; t += step) times.push(Math.round(t * 1000) / 1000);
+        const cellW = Math.round(W * scale),
+          cellH = Math.round(H * scale),
+          label = 16,
+          gap = 6;
+        const rows = Math.ceil(times.length / cols);
+        const sheet = $('#sheet');
+        sheet.width = cols * cellW + (cols + 1) * gap;
+        sheet.height = rows * (cellH + label) + (rows + 1) * gap;
+        const ctx = sheet.getContext('2d');
+        ctx.fillStyle = '#10201F';
+        ctx.fillRect(0, 0, sheet.width, sheet.height);
+        times.forEach((t, i) => {
+          const x = gap + (i % cols) * (cellW + gap),
+            y = gap + Math.floor(i / cols) * (cellH + label + gap);
+          blit(sheet, selected, t, x, y, scale);
+          ctx.fillStyle = '#ECE2C5';
+          ctx.font = '12px ui-monospace, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(
+            `t=${t.toFixed(2)}s  p=${(t / selected.duration).toFixed(3)}`,
+            x + 2,
+            y + cellH + 12,
+          );
+        });
+        sheet.hidden = false;
+        $('#heading').textContent = `${selected.name} · contact sheet`;
+        $('#about').textContent =
+          `${selected.about} · ${times.length} frames, ${from}–${to} s every ${step} s`;
+        link(query({ item: selected.key, ...houseQuery }), 'Play this one');
+      } else if (selected) {
+        // ---- One item at 1280×720, with a scrubber and its soundtrack.
+        const canvas = $('#render');
+        canvas.hidden = false;
+        $('#player').hidden = false;
+        $('#heading').textContent = selected.name;
+        $('#about').textContent = selected.about;
+        link(query({ item: selected.key, sheet: '1', ...houseQuery }), 'Contact sheet');
+        const index = items.indexOf(selected);
+        link(
+          query({ item: items[(index + items.length - 1) % items.length].key, ...houseQuery }),
+          '← Previous',
+        );
+        link(query({ item: items[(index + 1) % items.length].key, ...houseQuery }), 'Next →');
+        let elapsed = Math.min(selected.duration, Math.max(0, number('t', 0)));
+        let playing = false,
+          last,
+          player,
+          sound = false;
+        const scrub = $('#scrub');
+        scrub.max = String(selected.duration);
+        const paint = () => {
+          blit(canvas, selected, elapsed);
+          scrub.value = String(elapsed);
+          $('#time').value = `${elapsed.toFixed(2)} s`;
+          $('#play').textContent = playing ? 'Pause' : 'Play';
+          $('#sound').textContent = sound ? 'Mute' : 'Turn sound on';
+          $('#sound').setAttribute('aria-pressed', String(sound));
+          player?.cinemaSound(
+            sound && playing && !document.hidden
+              ? {
+                  film: selected.playable,
+                  elapsed,
+                  key: `preview:${selected.key}`,
+                  gain: 1,
+                  pan: 0,
+                }
+              : undefined,
+          );
+          $('#audio-status').textContent = sound
+            ? `Sound: ${player?.cinemaStatus ?? 'starting'}`
+            : 'Sound is off.';
+        };
+        $('#play').onclick = () => {
+          playing = !playing;
+          if (playing && elapsed >= selected.duration - 1e-3) elapsed = 0;
+          paint();
+        };
+        $('#sound').onclick = async () => {
+          if (sound) {
+            sound = false;
+            paint();
+            return;
+          }
+          try {
+            const { TownPlayer } = await import('/src/music/player.ts');
+            player ??= new TownPlayer();
+            await player.resume();
+            player.volume(0.7);
+            sound = true;
+          } catch {
+            $('#audio-status').textContent = 'Sound could not start.';
+          }
+          paint();
+        };
+        scrub.oninput = () => {
+          elapsed = Number(scrub.value);
+          playing = false;
+          paint();
+        };
+        const tick = (now) => {
+          if (playing && last !== undefined && !document.hidden) {
+            elapsed += Math.min(now - last, 250) / 1000;
+            if (elapsed >= selected.duration) elapsed %= selected.duration;
+            paint();
+          }
+          last = now;
+          requestAnimationFrame(tick);
+        };
+        window.addEventListener('pagehide', () => player?.dispose());
+        paint();
+        requestAnimationFrame(tick);
+      } else {
+        // ---- Every live break, each on a poster frame.
+        const list = $('#list');
+        list.hidden = false;
+        const shown = items.filter((item) => item.key.startsWith('card:') || item.live);
+        $('#about').append(
+          ` ${shown.length} breaks: ${Object.keys(BREAK_CARDS).length} cards and ${LIVE_BREAK_ADS.length} ads. Cards show ${house?.place.name ?? 'their sample house'}.`,
+        );
+        for (const item of shown) {
+          const article = document.createElement('article');
+          const canvas = document.createElement('canvas');
+          canvas.width = W * 2;
+          canvas.height = H * 2;
+          canvas.setAttribute('aria-label', item.name);
+          blit(canvas, item, item.duration * 0.45, 0, 0, 2);
+          const title = document.createElement('h2');
+          const a = document.createElement('a');
+          a.href = query({ item: item.key, ...houseQuery });
+          a.textContent = item.name;
+          title.append(a);
+          const about = document.createElement('p');
+          const sheet = document.createElement('a');
+          sheet.href = query({ item: item.key, sheet: '1', ...houseQuery });
+          sheet.textContent = 'contact sheet';
+          about.append(`${item.key} · ${item.about} · `, sheet);
+          article.append(canvas, title, about);
+          list.append(article);
+        }
+      }
+    </script>
+  </body>
+</html>

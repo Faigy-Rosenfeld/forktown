@@ -30,3 +30,74 @@ The Starlight Cinema is also in the pool of daily broadcast highlights. When sel
 ## Sound for recording
 
 Town music starts automatically when the browser permits audible autoplay. Football kicks, whistles, and cheers use the camera's distance from the ground. Browsers can block sound on a fresh visit: allow sound/autoplay for the site or click anywhere on the page (a key press also retries). No sound button or prompt appears in the recording. Background tabs suspend sound and catch up with the live town when visible again. Ensure the capture browser is active and its audio output is included in your recording setup.
+
+## Breaks
+
+The live page can cut away from the town for a short break: a town ad or a card, drawn at 320×180 like the cinema's films and scaled whole over the picture (dusk fills any margin). A break fades in over its first 400 ms and out over its last 400 ms, and ads end on their sponsor card instead of fading it. Breaks are off unless the address asks for them, so a plain `/live/` is exactly the town.
+
+### Address parameters
+
+| Parameter                                   | Effect                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `breaks`                                    | Turns scheduled breaks on. Bare (`?breaks`), empty (`breaks=`) or anything but a whole number means every 30 minutes; `breaks=<N>` with N from 1 to 120 means every N minutes.                                                                                                                                                                                  |
+| `break=ad:<artwork>` or `break=card:<card>` | Shows one item once, for testing or a preview: any live-break ad (`eggs`, `matchday`, `disco`, `millpond`, `zoo`, `realty`, `tube`, `ducks`, `lanterns`, `movers`) or card (`right-back`, `coming-up`, `neighbors`, `welcome`). It starts 2 s after the page opens, and at least half a second after the break pictures have loaded. Unknown names are ignored. |
+| `welcome=<id>,<id>`                         | Welcomes up to three new neighbors by house id (see below). Founding houses and unknown ids are skipped.                                                                                                                                                                                                                                                        |
+| `welcomeWait=1`                             | The welcome waits for `forktownLive.startWelcome()` instead of starting 2 s after the page opens. If nothing calls it, it starts 30 s after the page opens.                                                                                                                                                                                                     |
+| `welcomeSince=<ms>`                         | When the welcome was asked for (epoch ms). A welcome more than ten minutes old is dropped, so a reload after a crash doesn't welcome the same neighbor again.                                                                                                                                                                                                   |
+
+Anything else in the address, such as a cache-busting `v=`, is ignored.
+
+### The schedule
+
+Scheduled breaks follow real UTC time, so every viewer and every reload agrees. With the default 30 minutes there is one break per real half hour, starting on :00 or :30. Each slot airs one item from a pool of twelve: the ten live-break ads (every cinema ad except the snack bar and "phones off"), "Coming up in Forktown." and "Meet the neighbors.". The pool is shuffled once per pass, so each item airs once before any repeats, and the same item never airs twice in a row. "Meet the neighbors." moves on to the next neighbor's house each pass (in id order; founding houses fill in only while fewer than three neighbors live in town). "Coming up in Forktown." lists the next three billed moments with their town times, a real-time countdown, and the town date and moon.
+
+A break never covers a protected moment. These are the scenery minute (05:00–06:00), lantern hour (19:58–20:24, when the town has homes), and that day's featured highlights: the duck walk, the football match, the lunch gathering and the zoo afternoon, the evening concert, the midnight disco and the cinema's program. When a slot opens during one, the break waits in 5 s steps until it has 2 s of clear air before it and 3 s after it. Every break ends inside its own slot, and a slot with no clear gap long enough is skipped. A page that opens (or reloads) during a break, or less than 15 s before one starts, skips that break, so a reloaded capture page never joins one partway through.
+
+### The welcome
+
+When a house moves in, the stream box reloads the page with `welcome=<id>`. Each new neighbor gets a 10 s "A new neighbor just moved in." card with the house, its resident, the builder's `@handle` and its lantern number when known. Then the camera holds on the house for 25 s, and the follow label reads "New neighbor" and the house's name. The camera moves to the house as soon as the card covers the town, so the card fades out on the house itself. Up to three houses follow one another. Each 35 s welcome starts in the first clear 5 s step that meets no protected moment or scheduled break, with the same 2 s and 3 s margins. A house that can't start within ten minutes is left out. With `welcomeWait=1`, the box calls `startWelcome()` once the page is on air, so the welcome is never hidden behind the box's own intermission.
+
+### Pictures, sound and fonts
+
+The ads and cards live in the same lazily loaded chunk as the cinema's films. When any break feature is on, the page fetches that chunk and the four faces the art writes in (Fraunces, Fraunces italic, Space Mono and DM Sans) as it opens, so no break paints in a fallback font. Until they arrive the town carries on without breaks. If the chunk can't load, the page shows no breaks or welcome cards and asks for it again every 30 s. The welcome waits up to ten seconds for them before it goes ahead, holding on the house without its card if it must. While a break fully covers the picture the town stops painting, but the camera keeps moving underneath. A break's jingle plays at full volume in the centre and lowers the town music, and the football sounds pause. The page renders the next break's sound up to 15 s before it starts, so its first note is on time.
+
+### `window.forktownLive`
+
+Every `/live/` page installs a small API for the stream box, with or without breaks:
+
+```ts
+window.forktownLive = {
+  version: 1,
+  build: { sha: string | null, builtAt: string },   // this build, as in live/build.json
+  quietFor(seconds): boolean,   // no protected moment and no welcome step in the next N seconds
+  startWelcome(): boolean,      // starts a waiting welcome; idempotent; false when there is none (or it is over)
+  state(): {
+    shot: string, label: string,                      // the camera's current shot id and label
+    break: { key, item, endsAt } | null,              // the break on screen: e.g. key 'break:<slot>', item 'ad:eggs', endsAt in epoch ms
+    welcome: 'none' | 'armed' | 'scheduled' | 'showing' | 'done',
+    films: 'loading' | 'ready' | 'missing',           // the break pictures and fonts
+    build: { sha, builtAt },
+  },
+};
+```
+
+Break keys are `break:<slot>` for a scheduled break, `welcome:<id>:<start>` for a welcome card and `forced:<item>` for a `break=` item. While a break or welcome card is on screen, `main.live-stream` also carries `data-break="<key>"`, which the stream box uses to hide its clock overlay. The town canvas keeps the accessible name `Forktown live: …`, naming the break during one. It is the only element with that name, and the break layer is hidden from assistive technology.
+
+`quietFor` lets the box wait for a clear moment before a planned reload. Scheduled breaks don't count against it, because the box covers a reload with its own intermission and the reloaded page skips a break in progress.
+
+### `live/build.json`
+
+The production build also writes `live/build.json`, which the stream box polls to spot a deploy:
+
+```json
+{
+  "version": 1,
+  "sha": "<git revision or null>",
+  "builtAt": "<ISO time>",
+  "houses": [{ "id": "…", "name": "…", "creator": "…", "founder": false }],
+  "arrivals": ["<newest id>", "…"],
+  "latestArrival": { "id": "…", "name": "…", "creator": "…" }
+}
+```
+
+`sha` and `builtAt` match `forktownLive.build`. When the published file's identity differs from the page's, the box works out which houses are new, waits for `quietFor`, and reloads with `welcome=<ids>&welcomeWait=1&welcomeSince=<now>`. The stream box's side, including the pre-rendered intermission reel it plays while the page reloads, is described in [the intermission reel guide](INTERMISSION_REEL.md).

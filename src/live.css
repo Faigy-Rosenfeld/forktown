@@ -214,3 +214,20 @@
     gap: 7px;
   }
 }
+
+/* A break (an ad or a card) covers the whole picture: the 320×180 art scaled whole, dusk around
+   it. LiveStream sets its opacity each frame for the 400 ms fades. */
+.live-break {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  background: #263c3c;
+  pointer-events: none;
+}
+.live-break canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}

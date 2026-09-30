@@ -866,6 +866,9 @@ function catHead(ctx: Ctx, f: Look, fur: string, furD: string, furS: string, sec
   line(ctx, whisker, 0.4, [8, 2.6, 13, 1.3]);
   line(ctx, whisker, 0.4, [8, 3.2, 13, 4.3 + Math.sin(seconds * 3) * 0.3]);
 }
+// The live stream's "We’ll be right back" card borrows Miso, asleep, from this film.
+export { miso, CURL, LOAF };
+export type { Joints as MisoJoints, Look as MisoLook };
 
 // ——— Miso, face on (for the close-ups) ———
 type Face = {
