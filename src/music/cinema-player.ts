@@ -1,8 +1,8 @@
-import type { Screening } from '../lib/cinema';
+import type { Playable } from '../lib/break-cards';
 import { renderCinemaTrack } from './synth';
 
 export type CinemaPlayback = {
-  film: Screening;
+  film: Playable;
   elapsed: number;
   key: string;
   gain: number;
@@ -63,12 +63,7 @@ export class CinemaPlayer {
     this.duck(0);
     if (this.pending === state.key) return;
     this.pending = state.key;
-    let rendered = this.cache.get(state.film.id);
-    if (!rendered) {
-      rendered = renderCinemaTrack(state.film);
-      this.cache.set(state.film.id, rendered);
-      if (this.cache.size > 2) this.cache.delete(this.cache.keys().next().value!);
-    }
+    const rendered = this.render(state.film);
     const key = state.key;
     void rendered
       .then((buffer) => {
@@ -110,6 +105,25 @@ export class CinemaPlayer {
           this.failedKey = key;
         }
       });
+  }
+  /** Renders a film, ad or card ahead of time, so its sound is ready the moment it starts. */
+  prepare(film: Playable) {
+    if (this.disposed || this.cache.has(film.id)) return;
+    const rendered = this.render(film);
+    // A failed warm-up leaves nothing cached, so playing it later simply tries again.
+    void rendered.catch(() => {
+      if (this.cache.get(film.id) === rendered) this.cache.delete(film.id);
+    });
+  }
+  /** One render per film id, keeping the last three (the break, the next one, and a spare). */
+  private render(film: Playable) {
+    let rendered = this.cache.get(film.id);
+    if (!rendered) {
+      rendered = renderCinemaTrack(film);
+      this.cache.set(film.id, rendered);
+      if (this.cache.size > 3) this.cache.delete(this.cache.keys().next().value!);
+    }
+    return rendered;
   }
   private release() {
     if (!this.current) return;

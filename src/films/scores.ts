@@ -1,10 +1,15 @@
 import type { AdArtwork, FilmArtwork } from '../lib/cinema';
+import { carryInMoversAdScore } from './ads/carry-in-movers';
+import { duckCrossingAuthorityAdScore } from './ads/duck-crossing-authority';
 import { farmEggsAdScore } from './ads/farm-eggs';
+import { lanternForkElectricAdScore } from './ads/lantern-fork-electric';
 import { discoAdScore } from './ads/little-stage-disco';
 import { matchdayAdScore } from './ads/matchday';
 import { millpondAdScore } from './ads/millpond';
+import { openPlotRealtyAdScore } from './ads/open-plot-realty';
 import { phonesOffAdScore } from './ads/phones-off';
 import { snackBarAdScore } from './ads/snack-bar';
+import { theTreelineAdScore } from './ads/the-treeline';
 import { zooAdScore } from './ads/willow-grove-zoo';
 import { boltAndTheBloomScore } from './bolt-and-the-bloom';
 import { booPolitelyScore } from './boo-politely';
@@ -66,4 +71,11 @@ export const AD_SCORES: Record<AdArtwork, AdModule['score']> = {
   disco: discoAdScore,
   millpond: millpondAdScore,
   zoo: zooAdScore,
+  realty: openPlotRealtyAdScore,
+  tube: theTreelineAdScore,
+  ducks: duckCrossingAuthorityAdScore,
+  lanterns: lanternForkElectricAdScore,
+  movers: carryInMoversAdScore,
 };
+/** The break cards' jingles, from their draw-free jingle modules (never the card pictures). */
+export { CARD_SCORES } from './cards/jingles';

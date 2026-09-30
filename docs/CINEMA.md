@@ -48,15 +48,22 @@ Films run from **60 to 180 seconds, in ten-second steps**. Each town day shuffle
 
 Whatever the films leave, always less than a minute, is filled exactly with **ads from around town**. Each spot plays once before any repeats. Ads run in the break after a film, before the card that announces the next one; on a one-film night they are a pre-show after the opening card. With tonight's library no break is longer than 30 seconds.
 
-| Ad                           | Length | Spot                                                                     |
-| ---------------------------- | ------ | ------------------------------------------------------------------------ |
-| Starlight Snack Bar          | 10 s   | Kernels pop out of a striped bucket until the heap spills over.          |
-| The Starlight Cinema         | 10 s   | One phone lights up the lawn; the whole row turns to glare.              |
-| Moon Harvest Farm            | 10 s   | The moon sets, the sun rises, and three hens fill the gate basket.       |
-| The Meadow Ground            | 10 s   | One kick, one goal, and Grandma Ada's cheer blows the keeper's cap off.  |
-| Midnight at the Little Stage | 20 s   | The clock strikes twelve and a shy grandad takes the floor.              |
-| The Millpond                 | 20 s   | A duck quacks at a heron until the heron leaves.                         |
-| Willow Grove Zoo             | 30 s   | Giraffe, elephant, zebras, and a penguin who comes right up to the lens. |
+| Ad                           | Length | Spot                                                                                                       |
+| ---------------------------- | ------ | ---------------------------------------------------------------------------------------------------------- |
+| Starlight Snack Bar          | 10 s   | Kernels pop out of a striped bucket until the heap spills over.                                            |
+| The Starlight Cinema         | 10 s   | One phone lights up the lawn; the whole row turns to glare.                                                |
+| Moon Harvest Farm            | 10 s   | The moon sets, the sun rises, and three hens fill the gate basket.                                         |
+| The Meadow Ground            | 10 s   | One kick, one goal, and Grandma Ada's cheer blows the keeper's cap off.                                    |
+| Midnight at the Little Stage | 20 s   | The clock strikes twelve and a shy grandad takes the floor.                                                |
+| The Millpond                 | 20 s   | A duck quacks at a heron until the heron leaves.                                                           |
+| Willow Grove Zoo             | 30 s   | Giraffe, elephant, zebras, and a penguin who comes right up to the lens.                                   |
+| Open Plot Realty             | 30 s   | An agent tours the open plots and a six-style catalogue; the down payment turns out to be one JSON file.   |
+| The Treeline                 | 20 s   | An umbrella's story at Hedgerow Halt, a ride behind the tree line, and a windswept arrival at Willow Halt. |
+| Duck Crossing Authority      | 20 s   | Three duck rules, five numbered ducklings, and the fifth one dashing across by the Lunch Green.            |
+| Lantern Fork Electric        | 10 s   | A lamplighter is beaten to every lantern at 20:00, oldest first, and dozes off as the streetlamps follow.  |
+| Carry-In Movers              | 10 s   | The checklist goes green and two movers carry a first house to its plot.                                   |
+
+Every ad except the snack bar and "phones off" also plays in the live stream's breaks ([Forktown Live](LIVE.md#breaks)).
 
 Because the screen time is fixed, every bill ends by 23:54 and the screen is stowed before midnight. The Little Stage's night party, resident bedtimes, and the live director's night coverage all rely on that. The tests check every night of a year, and the latest possible bill (three one-minute films, the most cards).
 

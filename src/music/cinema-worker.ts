@@ -1,6 +1,6 @@
-import type { Screening } from '../lib/cinema';
+import type { Playable } from '../lib/break-cards';
 import { renderCinemaPCM } from './cinema-render';
-self.onmessage = (event: MessageEvent<Screening>) => {
+self.onmessage = (event: MessageEvent<Playable>) => {
   try {
     const mix = renderCinemaPCM(event.data);
     self.postMessage(mix, { transfer: [mix.left.buffer, mix.right.buffer] });

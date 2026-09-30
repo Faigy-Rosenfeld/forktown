@@ -1,6 +1,7 @@
+import type { BreakCard, BreakCardData, CardArtwork } from '../lib/break-cards';
 import type { AdArtwork, CinemaAd, CinemaFilm, CinemaSlot, FilmArtwork } from '../lib/cinema';
-import { slate, titles } from '../films/kit';
-import type { AdModule, FilmModule } from '../films/types';
+import { slate, titles, write } from '../films/kit';
+import type { AdModule, CardModule, FilmModule } from '../films/types';
 
 type Ctx = CanvasRenderingContext2D;
 const W = 320,
@@ -34,6 +35,7 @@ function nightSky(ctx: Ctx, seconds: number) {
 type ReelModule = typeof import('../films');
 let reel: Record<FilmArtwork, FilmModule> | undefined;
 let ads: Record<AdArtwork, AdModule> | undefined;
+let cards: Record<CardArtwork, CardModule> | undefined;
 let reeling: Promise<Record<FilmArtwork, FilmModule>> | undefined;
 /** After a failed load: when it failed, how many tries so far, and where a retry can ask. */
 let trouble: { since: number; tries: number; retry?: string } | undefined;
@@ -71,6 +73,7 @@ export function loadReel(open = openReel) {
   reeling = open(trouble?.retry).then(
     (module) => {
       ads = module.ADS;
+      cards = module.CARDS;
       trouble = undefined;
       return (reel = module.REEL);
     },
@@ -87,6 +90,8 @@ export function loadReel(open = openReel) {
 
 /** True while the reel has failed to arrive, so the screen and the cinema panel can say so. */
 export const reelMissing = () => trouble !== undefined;
+/** True once the ads and the live stream's break cards have arrived and can draw themselves. */
+export const reelReady = () => ads !== undefined && cards !== undefined;
 
 /** Shown for the moment it takes the reel to arrive, if someone sits down mid-film. */
 function threading(ctx: Ctx, film: CinemaFilm, seconds: number) {
@@ -135,6 +140,32 @@ export function drawCinemaAd(ctx: Ctx, ad: CinemaAd, elapsed: number) {
     nightSky(ctx, elapsed);
     words(ctx, ad.sponsor.toUpperCase(), 96, 9, '#DBBF89');
     words(ctx, ad.tagline, 114, 7, '#ADBFBA');
+  }
+  ctx.restore();
+}
+
+/**
+ * A live-stream break ad: the cinema spot, except that its sponsor slate holds to the very end
+ * instead of fading, so the stream cuts back to the town from a full card.
+ */
+export function drawBreakAd(ctx: Ctx, ad: CinemaAd, elapsed: number) {
+  drawCinemaAd(ctx, ad, Math.min(elapsed, ad.duration - 0.5));
+}
+
+/** A live-stream break card, drawn from its reel module with the stream's data. */
+export function drawBreakCard(ctx: Ctx, card: BreakCard, elapsed: number, data: BreakCardData) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+  const module = cards?.[card.card];
+  if (module) module.draw(ctx, clamp(elapsed / card.duration), elapsed, data);
+  else {
+    void loadReel();
+    // Plain dusk and the card's own title, for the moment it takes the reel to arrive.
+    box(ctx, 0, 0, W, H, '#263C3C');
+    write(ctx, 'FORKTOWN', W / 2, 72, { size: 6, color: '#BFD8A6' });
+    write(ctx, card.title, W / 2, 98, { size: 16, type: 'serif', color: '#F1EEDC' });
   }
   ctx.restore();
 }

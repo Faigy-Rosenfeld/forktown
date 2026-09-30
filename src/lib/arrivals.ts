@@ -3,3 +3,5 @@
 
 /** The build's arrival order, newest first. One shared instance so memos keyed on it can hit. */
 export const townArrivals: readonly string[] = __TOWN_ARRIVALS__;
+/** When each house last moved in (ISO dates by id); empty without history. */
+export const townArrivalDates: Readonly<Record<string, string>> = __TOWN_ARRIVAL_DATES__;

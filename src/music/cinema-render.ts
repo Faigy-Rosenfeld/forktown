@@ -1,4 +1,4 @@
-import type { Screening } from '../lib/cinema';
+import type { Playable } from '../lib/break-cards';
 import { cinemaScore, type FilmEffect } from './cinema-score';
 import { SAMPLE_RATE, voice, type Mix } from './render';
 
@@ -255,7 +255,7 @@ function effect(kind: FilmEffect, t: number, duration: number, noise: number, lo
 }
 
 /** A complete, non-looping stereo film mix; seeking never depends on earlier playback. */
-export function renderCinemaPCM(film: Screening): Mix {
+export function renderCinemaPCM(film: Playable): Mix {
   const frames = Math.round(film.duration * SAMPLE_RATE);
   const left = new Float32Array(frames),
     right = new Float32Array(frames);

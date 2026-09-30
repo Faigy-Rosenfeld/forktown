@@ -443,3 +443,26 @@ describe('A quiet first install and build', () => {
     expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1300);
   });
 });
+
+describe('The live stream’s build manifest', () => {
+  const config = () => readFileSync('vite.config.ts', 'utf8');
+
+  it('comes after the chunk budget, from a plugin of its own', () => {
+    expect(config()).toMatch(/chunkBudget\(\),\s*buildManifest\(\s*BUILD,/);
+  });
+
+  it('names the same build as the page, computed once', () => {
+    const source = config();
+    expect(source.match(/readBuildInfo\(/g)).toHaveLength(1);
+    expect(source).toMatch(/const BUILD = readBuildInfo\(process\.cwd\(\)\);/);
+    expect(source).toContain('__FORKTOWN_BUILD__: JSON.stringify(BUILD)');
+    expect(source).toContain('__TOWN_ARRIVAL_DATES__: JSON.stringify(arrivalDates(arrivals))');
+  });
+
+  it('never reaches the browser-only roster from the config', () => {
+    for (const file of ['scripts/build-manifest.ts', 'scripts/town-arrivals.ts', 'vite.config.ts'])
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(
+        /from ['"][^'"]*\/(?:places|arrivals|live-breaks)(?:\.ts)?['"]/,
+      );
+  });
+});
